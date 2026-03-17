@@ -1,6 +1,12 @@
 """
-Динамическая загрузка DBI-схемы из исходников tdesktop
-для конкретной версии Telegram Desktop.
+Динамическая загрузка DBI-схемы.
+
+Приоритет источников:
+  1. Кэш  ~/.cache/tg-settings/schema_<version>.json
+  2. GitHub  (storage_settings_scheme.h для конкретного тега)
+  3. Offline  — схема строится из самого расшифрованного потока tdata/settings
+               методом sequential scan с «якорными» блоками известного формата.
+               Статического fallback больше нет.
 """
 
 import re
@@ -16,7 +22,9 @@ from typing import Optional
 CACHE_DIR = Path.home() / '.cache' / 'tg-settings'
 
 
-# ── Cache ────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# Cache
+# ────────────────────────────────────────────────────────────────────────────
 
 def _cache_path(version_str: str) -> Path:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -42,7 +50,9 @@ def _save_cache(version_str: str, schema: dict):
         pass
 
 
-# ── Version detection ────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# Version detection
+# ────────────────────────────────────────────────────────────────────────────
 
 def _find_telegram_binary() -> Optional[Path]:
     candidates = [
@@ -101,9 +111,9 @@ def get_tg_version_from_tdata(tdata: Path) -> Optional[str]:
             if raw[:4] != b'TDF$':
                 continue
             ver_int = struct.unpack_from('<I', raw, 4)[0]
-            if ver_int > 1000000:
-                major = ver_int // 1000000
-                rest  = ver_int % 1000000
+            if ver_int > 1_000_000:
+                major = ver_int // 1_000_000
+                rest  = ver_int % 1_000_000
                 minor = rest // 1000
                 patch = rest % 1000
                 return f'{major}.{minor}.{patch}'
@@ -112,10 +122,12 @@ def get_tg_version_from_tdata(tdata: Path) -> Optional[str]:
     return None
 
 
-# ── GitHub API ───────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# GitHub API
+# ────────────────────────────────────────────────────────────────────────────
 
 GITHUB_API = 'https://api.github.com'
-REPO = 'telegramdesktop/tdesktop'
+REPO       = 'telegramdesktop/tdesktop'
 
 
 def _gh_get(url: str) -> Optional[dict | list]:
@@ -123,7 +135,7 @@ def _gh_get(url: str) -> Optional[dict | list]:
         url,
         headers={
             'User-Agent': 'tdesktop-settings-tool/1.0',
-            'Accept': 'application/vnd.github.v3+json',
+            'Accept':     'application/vnd.github.v3+json',
         },
     )
     try:
@@ -131,7 +143,7 @@ def _gh_get(url: str) -> Optional[dict | list]:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            print('[!] GitHub rate limit exceeded. Используем fallback схему.')
+            print('[!] GitHub rate limit exceeded.')
         return None
     except Exception as e:
         print(f'[!] GitHub API ошибка: {e}')
@@ -140,20 +152,19 @@ def _gh_get(url: str) -> Optional[dict | list]:
 
 def find_git_tag(version_str: str) -> Optional[str]:
     for tag_fmt in [f'v{version_str}', version_str]:
-        url = f'{GITHUB_API}/repos/{REPO}/git/refs/tags/{tag_fmt}'
+        url  = f'{GITHUB_API}/repos/{REPO}/git/refs/tags/{tag_fmt}'
         data = _gh_get(url)
         if data and 'ref' in data:
             return tag_fmt
 
-    url = f'{GITHUB_API}/repos/{REPO}/tags?per_page=50'
+    url  = f'{GITHUB_API}/repos/{REPO}/tags?per_page=50'
     tags = _gh_get(url)
     if not tags:
         return None
 
     version_clean = version_str.lstrip('v')
     for tag in tags:
-        name = tag.get('name', '').lstrip('v')
-        if name == version_clean:
+        if tag.get('name', '').lstrip('v') == version_clean:
             return tag['name']
 
     parts = version_clean.split('.')
@@ -163,7 +174,6 @@ def find_git_tag(version_str: str) -> Optional[str]:
             if tag.get('name', '').startswith(prefix):
                 print(f'[~] Точный тег не найден, используем ближайший: {tag["name"]}')
                 return tag['name']
-
     return None
 
 
@@ -179,24 +189,26 @@ def fetch_scheme_header(tag: str) -> Optional[str]:
         return None
 
 
-# ── Enum parser ──────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# Enum parser  (используется когда есть доступ к GitHub)
+# ────────────────────────────────────────────────────────────────────────────
 
 _NAME_TO_FMT_HINTS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r'Key$'),             'u64'),
-    (re.compile(r'Keys?$'),           'u64'),
-    (re.compile(r'Authorization$'),   'ba'),
-    (re.compile(r'Settings$'),        'ba'),
-    (re.compile(r'Config$'),          'ba'),
-    (re.compile(r'Options$'),         'ba'),
-    (re.compile(r'Path$'),            'str'),
-    (re.compile(r'ThemeKey$'),        'theme_key'),
-    (re.compile(r'TileBackground$'),  'two_i32'),
-    (re.compile(r'BackgroundKey$'),   'two_u64'),
-    (re.compile(r'Percent$'),         'i32'),
-    (re.compile(r'Volume$'),          'i32'),
-    (re.compile(r'Speed$'),           'i32'),
-    (re.compile(r'Saving$'),          'i32'),
-    (re.compile(r'CacheSettings'),    'ba'),
+    (re.compile(r'Key$'),            'u64'),
+    (re.compile(r'Keys?$'),          'u64'),
+    (re.compile(r'Authorization$'),  'ba'),
+    (re.compile(r'Settings$'),       'ba'),
+    (re.compile(r'Config$'),         'ba'),
+    (re.compile(r'Options$'),        'ba'),
+    (re.compile(r'Path$'),           'str'),
+    (re.compile(r'ThemeKey$'),       'theme_key'),
+    (re.compile(r'TileBackground$'), 'two_i32'),
+    (re.compile(r'BackgroundKey$'),  'two_u64'),
+    (re.compile(r'Percent$'),        'i32'),
+    (re.compile(r'Volume$'),         'i32'),
+    (re.compile(r'Speed$'),          'i32'),
+    (re.compile(r'Saving$'),         'i32'),
+    (re.compile(r'CacheSettings'),   'ba'),
 ]
 
 
@@ -208,39 +220,29 @@ def _guess_fmt(name: str) -> str:
 
 
 def parse_dbi_enum(header_src: str) -> dict[int, tuple[str, str]]:
-    SKIP = {'dbiEncryptedWithSalt', 'dbiEncrypted', 'dbiVersion', 'dbiKey', 'dbiUser'}
+    SKIP        = {'dbiEncryptedWithSalt', 'dbiEncrypted', 'dbiVersion', 'dbiKey', 'dbiUser'}
     SKIP_SUFFIX = 'Old'
 
     enum_match = re.search(r'\benum\s*\{([^}]+)\}', header_src, re.DOTALL)
     if not enum_match:
         return {}
 
-    enum_body = enum_match.group(1)
     schema: dict[int, tuple[str, str]] = {}
     current_val = 0
 
-    for line in enum_body.splitlines():
-        line = line.strip()
-        if not line or line.startswith('//'):
-            continue
+    for line in enum_match.group(1).splitlines():
         line = re.sub(r'//.*', '', line).strip().rstrip(',').strip()
         if not line:
             continue
-
         m = re.match(r'(dbi\w+)\s*(?:=\s*(0[xX][0-9a-fA-F]+|\d+))?', line)
         if not m:
             continue
-
-        raw_name = m.group(1)
-        val_str  = m.group(2)
-
+        raw_name, val_str = m.group(1), m.group(2)
         if val_str is not None:
             current_val = int(val_str, 0)
-
         if raw_name in SKIP or raw_name.endswith(SKIP_SUFFIX):
             current_val += 1
             continue
-
         name = raw_name[3:]
         schema[current_val] = (name, _guess_fmt(name))
         current_val += 1
@@ -248,16 +250,38 @@ def parse_dbi_enum(header_src: str) -> dict[int, tuple[str, str]]:
     return schema
 
 
-# ── Fallback ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# Offline schema inference  — строим схему из самого потока tdata/settings
+#
+# Идея:
+#   У нас есть «якорные» блоки — block_id с известным форматом, которые
+#   присутствуют во всех версиях TG и никогда не меняют своё значение
+#   формата (i32, ba, u64, …).  Мы используем их как опорные точки чтобы
+#   пройти поток sequential scan и «измерить» размер каждого блока.
+#   Блоки которых нет в якорях получают имя Unknown_0xXX и формат
+#   определяется эвристически через поиск следующего якоря.
+# ────────────────────────────────────────────────────────────────────────────
 
-FALLBACK_SCHEMA: dict[int, tuple[str, str]] = {
+# Якоря — block_id с гарантированно известным форматом.
+# Это минимально-стабильное подмножество схемы tdesktop,
+# существующее с версии 1.x и не менявшееся по типу данных.
+_ANCHORS: dict[int, tuple[str, str]] = {
     0x06: ('AutoStart',                'i32'),
     0x07: ('StartMinimized',           'i32'),
     0x0a: ('SeenTrayTooltip',          'i32'),
     0x0c: ('AutoUpdate',               'i32'),
     0x0d: ('LastUpdateCheck',          'i32'),
+    0x0e: ('SoundNotify',              'i32'),
+    0x0f: ('AutoDownload',             'i32'),
+    0x10: ('DesktopNotify',            'i32'),
+    0x14: ('WorkMode',                 'i32'),
+    0x1a: ('ConnectionType',           'ba'),
+    0x1c: ('DcOptions',                'ba'),
     0x1d: ('SendToMenu',               'i32'),
     0x23: ('DialogLastPath',           'str'),
+    0x24: ('RecentEmoji',              'ba'),
+    0x27: ('RecentStickers',           'ba'),
+    0x28: ('EmojiVariants',            'ba'),
     0x4b: ('MtpAuthorization',         'ba'),
     0x4d: ('SessionSettings',          'ba'),
     0x4e: ('LangPackKey',              'u64'),
@@ -270,62 +294,235 @@ FALLBACK_SCHEMA: dict[int, tuple[str, str]] = {
     0x5e: ('ApplicationSettings',      'ba'),
     0x60: ('FallbackProductionConfig', 'ba'),
     0x61: ('BackgroundKey',            'two_u64'),
+    0x64: ('NotifyView',               'i32'),
+}
+
+# Таблица размеров фиксированных форматов (байт после block_id)
+_FMT_FIXED: dict[str, int] = {
+    'i32':       4,
+    'u32':       4,
+    'u64':       8,
+    'theme_key': 20,   # u64 day + u64 night + u32 night_mode
+    'two_u64':   16,   # u64 + u64
+    'two_i32':   8,    # i32 + i32
 }
 
 
-# ── Public API ───────────────────────────────────────────────────────────
+def _value_size(data: bytes, p: int, fmt: str) -> Optional[int]:
+    """Возвращает размер значения в байтах начиная с позиции p."""
+    if fmt in _FMT_FIXED:
+        return _FMT_FIXED[fmt]
+    # str / ba  → QByteArray: 4 байта длина + данные
+    if fmt in ('str', 'ba'):
+        if p + 4 > len(data):
+            return None
+        n = struct.unpack_from('>I', data, p)[0]
+        return 4 if n == 0xFFFFFFFF else 4 + n
+    return None
+
+
+def _guess_fmt_by_bytes(data: bytes, vp: int) -> tuple[str, int]:
+    """
+    Эвристика для блока с неизвестным форматом.
+    Перебираем кандидатов и смотрим — ведёт ли предполагаемый размер
+    к следующему якорному block_id (или к нулям в конце потока).
+    Возвращает (fmt, size).
+    """
+    # Порядок: сначала фиксированные, потом переменные
+    fixed_candidates = [
+        ('i32', 4), ('u32', 4), ('u64', 8),
+        ('two_i32', 8), ('two_u64', 16), ('theme_key', 20),
+        ('i32', 12), ('i32', 24), ('i32', 32),
+    ]
+    for fmt, size in fixed_candidates:
+        nxt = vp + size
+        if nxt + 4 > len(data):
+            continue
+        nxt_id = struct.unpack_from('>I', data, nxt)[0]
+        if nxt_id in _ANCHORS or nxt_id == 0:
+            return fmt, size
+
+    # Пробуем QByteArray
+    if vp + 4 <= len(data):
+        n = struct.unpack_from('>I', data, vp)[0]
+        if n == 0xFFFFFFFF:
+            nxt = vp + 4
+            if nxt + 4 <= len(data):
+                nxt_id = struct.unpack_from('>I', data, nxt)[0]
+                if nxt_id in _ANCHORS or nxt_id == 0:
+                    return 'ba', 4
+        elif 0 < n < 10 * 1024 * 1024:
+            nxt = vp + 4 + n
+            if nxt + 4 <= len(data):
+                nxt_id = struct.unpack_from('>I', data, nxt)[0]
+                if nxt_id in _ANCHORS or nxt_id == 0:
+                    return 'ba', 4 + n
+
+    # Ничего не подошло — скипаем 4 байта (i32 по умолчанию)
+    return 'i32', 4
+
+
+def infer_schema_from_stream(raw_stream: bytes) -> dict[int, tuple[str, str]]:
+    """
+    Строит DBI-схему из расшифрованного потока tdata/settings.
+
+    Проходит поток sequential scan используя _ANCHORS как опорные точки.
+    Для неизвестных block_id определяет размер эвристически и
+    присваивает имя Unknown_0xXX.
+
+    Возвращает схему вида {block_id: (name, fmt)}.
+    Блоки реально присутствующие в потоке — гарантированно есть в схеме.
+    """
+    schema: dict[int, tuple[str, str]] = {}
+    p = 0
+    unknown_counter = 0
+
+    while p + 4 <= len(raw_stream):
+        block_id = struct.unpack_from('>I', raw_stream, p)[0]
+
+        # Конец потока
+        if block_id == 0:
+            break
+
+        # Мусор — выходим
+        if not (0x01 <= block_id <= 0xFFFF):
+            break
+
+        vp = p + 4
+
+        if block_id in _ANCHORS:
+            name, fmt = _ANCHORS[block_id]
+            size = _value_size(raw_stream, vp, fmt)
+            if size is None:
+                break
+            schema[block_id] = (name, fmt)
+            p = vp + size
+
+        else:
+            # Неизвестный блок — определяем формат эвристически
+            fmt, size = _guess_fmt_by_bytes(raw_stream, vp)
+            name = f'Unknown_0x{block_id:02X}'
+            schema[block_id] = (name, fmt)
+            unknown_counter += 1
+            p = vp + size
+
+    if unknown_counter:
+        print(f'[~] Offline inference: {len(schema)} блоков '
+              f'({unknown_counter} неизвестных — Unknown_0xXX)')
+    else:
+        print(f'[✓] Offline inference: {len(schema)} блоков, все распознаны')
+
+    return schema
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Public API
+# ────────────────────────────────────────────────────────────────────────────
 
 def load_schema(
     tdata: Optional[Path] = None,
     binary: Optional[Path] = None,
     force_version: Optional[str] = None,
     offline: bool = False,
+    raw_stream: Optional[bytes] = None,
 ) -> tuple[dict[int, tuple[str, str]], str]:
     """
-    Загружает актуальную DBI-схему для установленной версии TG.
+    Загружает DBI-схему.  Порядок источников:
+
+      1. Кэш  (~/.cache/tg-settings/schema_<version>.json)
+      2. GitHub  (storage_settings_scheme.h)
+      3. Offline inference  (из расшифрованного потока tdata/settings)
+
+    Параметры:
+      tdata          — путь к папке tdata  (для определения версии и offline)
+      binary         — путь к бинарнику TG  (для определения версии)
+      force_version  — принудительная версия вида "5.9.1"
+      offline        — пропустить GitHub, сразу offline inference
+      raw_stream     — уже расшифрованный поток (если есть — используется
+                       для offline inference без повторной расшифровки)
+
     Возвращает (schema_dict, version_str).
     """
+    # ── Определяем версию ────────────────────────────────────────────────
     version = force_version
-
     if not version and tdata:
         version = get_tg_version_from_tdata(tdata)
-
     if not version:
         version = get_tg_version_from_binary(binary)
-
     if not version:
-        print('[~] Версия TG не определена, используется fallback-схема')
-        return FALLBACK_SCHEMA.copy(), 'unknown'
+        version = 'unknown'
 
     print(f'[*] Версия TG: {version}')
 
-    cached = _load_cache(version)
-    if cached:
-        schema = {int(k): tuple(v) for k, v in cached.items()}
-        print(f'[*] Схема загружена из кэша ({len(schema)} блоков)')
-        return schema, version
+    # ── Кэш ─────────────────────────────────────────────────────────────
+    if version != 'unknown':
+        cached = _load_cache(version)
+        if cached:
+            schema = {int(k): tuple(v) for k, v in cached.items()}
+            print(f'[*] Схема из кэша ({len(schema)} блоков)')
+            return schema, version
 
-    if offline:
-        print('[~] Offline режим, используется fallback-схема')
-        return FALLBACK_SCHEMA.copy(), version
+    # ── GitHub ───────────────────────────────────────────────────────────
+    if not offline and version != 'unknown':
+        print(f'[*] Загружаем схему с GitHub для v{version}...')
+        tag = find_git_tag(version)
+        if tag:
+            print(f'[*] Тег: {tag}')
+            header_src = fetch_scheme_header(tag)
+            if header_src:
+                schema = parse_dbi_enum(header_src)
+                if schema:
+                    _save_cache(version, {str(k): list(v) for k, v in schema.items()})
+                    print(f'[✓] Схема с GitHub: {len(schema)} блоков, кэш сохранён')
+                    return schema, version
+        print('[~] GitHub недоступен, переходим к offline inference')
 
-    print(f'[*] Загружаем схему с GitHub для v{version}...')
-    tag = find_git_tag(version)
-    if not tag:
-        print(f'[!] Тег для v{version} не найден, используется fallback-схема')
-        return FALLBACK_SCHEMA.copy(), version
+    # ── Offline inference ────────────────────────────────────────────────
+    print('[*] Offline inference — строим схему из потока tdata/settings...')
 
-    print(f'[*] Тег: {tag}')
-    header_src = fetch_scheme_header(tag)
-    if not header_src:
-        print('[!] Не удалось скачать схему, используется fallback')
-        return FALLBACK_SCHEMA.copy(), version
+    stream = raw_stream
+    if stream is None and tdata is not None:
+        stream = _read_raw_stream(tdata)
 
-    schema = parse_dbi_enum(header_src)
-    if not schema:
-        print('[!] Не удалось распарсить enum, используется fallback')
-        return FALLBACK_SCHEMA.copy(), version
+    if stream is None:
+        # Совсем нет данных — отдаём только якоря как минимальную схему
+        print('[~] Поток недоступен, используем минимальную якорную схему')
+        return dict(_ANCHORS), version
 
-    _save_cache(version, {str(k): list(v) for k, v in schema.items()})
-    print(f'[✓] Схема загружена с GitHub: {len(schema)} блоков, кэш сохранён')
+    schema = infer_schema_from_stream(stream)
+
+    # Кэшируем результат inference чтобы не повторять каждый раз
+    if version != 'unknown':
+        _save_cache(version, {str(k): list(v) for k, v in schema.items()})
+        print(f'[*] Схема из inference закэширована')
+
     return schema, version
+
+
+def _read_raw_stream(tdata: Path) -> Optional[bytes]:
+    """
+    Читает и расшифровывает поток из tdata/settings.
+    Используется только для offline inference внутри load_schema.
+    """
+    # Импортируем здесь чтобы избежать циклического импорта
+    # (io.py → schema_loader, schema_loader → io было бы циклом)
+    try:
+        from .tdf import read_tdf
+        from .tdf import _read_qt_ba
+        from .crypto import derive_key, decrypt_local
+    except ImportError:
+        # Если вызывается как standalone скрипт
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from tg_config.tdf import read_tdf, _read_qt_ba
+        from tg_config.crypto import derive_key, decrypt_local
+
+    try:
+        payload, _ = read_tdf(tdata / 'settings')
+        salt, pos  = _read_qt_ba(payload, 0)
+        enc, _     = _read_qt_ba(payload, pos)
+        auth_key   = derive_key(salt)
+        return decrypt_local(enc, auth_key)
+    except Exception as e:
+        print(f'[!] Не удалось прочитать поток для inference: {e}')
+        return None
