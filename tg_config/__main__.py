@@ -4,29 +4,29 @@ tg-config — Telegram Desktop settings reader/writer.
 Entry point (uv run tg-config  /  python -m tg_config).
 """
 
-import sys
-import os
 import argparse
+import os
+import sys
 from pathlib import Path
 
 from . import schema as _schema
-from .schema_loader import load_schema
-from .scanner import get_positions, raw_read
-from .formatter import dump_all, dump_app_settings, dump_tail_info, deep_scan_diagnostic
 from .editor import apply_set, export_json, import_json
-from .io import load, save
 from .experimental import (
-    experimental_path,
-    parse_bool,
-    load_experimental,
-    save_experimental,
     dump_experimental,
+    experimental_path,
+    load_experimental,
+    parse_bool,
+    save_experimental,
 )
+from .formatter import deep_scan_diagnostic, dump_all, dump_app_settings, dump_tail_info
+from .io import load, save
+from .scanner import get_positions, raw_read
+from .schema_loader import load_schema
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description='Telegram Desktop settings reader/writer',
+        description="Telegram Desktop settings reader/writer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -46,43 +46,91 @@ Examples:
   %(prog)s --app-settings
   %(prog)s --export backup.json
   %(prog)s --import-file backup.json
-""")
-    ap.add_argument('--tdata',          default=None,
-                    help='path to Telegram Desktop tdata directory')
-    ap.add_argument('--set',            action='append', metavar='KEY=VALUE',
-                    help='set DBI setting value (can be used multiple times)')
-    ap.add_argument('--set-exp',        action='append', metavar='KEY=BOOL',
-                    help='set experimental option in experimental_options.json')
-    ap.add_argument('--unset-exp',      action='append', metavar='KEY',
-                    help='remove key from experimental_options.json')
-    ap.add_argument('--exp-list',       action='store_true',
-                    help='print known experimental options and current values')
-    ap.add_argument('--export',         metavar='FILE',
-                    help='export current known DBI settings to JSON')
-    ap.add_argument('--import-file',    metavar='FILE', dest='import_file',
-                    help='import DBI settings from JSON')
-    ap.add_argument('--dump-tail',      action='store_true',
-                    help='show parser stop offset and tail diagnostics')
-    ap.add_argument('--deep-scan',      action='store_true',
-                    help='scan for all known block IDs across full stream')
-    ap.add_argument('--app-settings',   action='store_true',
-                    help='decode and print ApplicationSettings blob')
-    ap.add_argument('-v', '--verbose',  action='store_true',
-                    help='include human-readable descriptions')
-    ap.add_argument('--offline',        action='store_true',
-                    help='skip GitHub schema fetch, use offline inference')
-    ap.add_argument('--schema-version', default=None,
-                    help='force Telegram version for schema lookup (e.g. 5.9.1)')
-    ap.add_argument('--schema-info',    action='store_true',
-                    help='print loaded DBI schema and exit')
+""",
+    )
+    ap.add_argument(
+        "--tdata", default=None, help="path to Telegram Desktop tdata directory"
+    )
+    ap.add_argument(
+        "--set",
+        action="append",
+        metavar="KEY=VALUE",
+        help="set DBI setting value (can be used multiple times)",
+    )
+    ap.add_argument(
+        "--set-exp",
+        action="append",
+        metavar="KEY=BOOL",
+        help="set experimental option in experimental_options.json",
+    )
+    ap.add_argument(
+        "--unset-exp",
+        action="append",
+        metavar="KEY",
+        help="remove key from experimental_options.json",
+    )
+    ap.add_argument(
+        "--exp-list",
+        action="store_true",
+        help="print known experimental options and current values",
+    )
+    ap.add_argument(
+        "--export", metavar="FILE", help="export current known DBI settings to JSON"
+    )
+    ap.add_argument(
+        "--import-file",
+        metavar="FILE",
+        dest="import_file",
+        help="import DBI settings from JSON",
+    )
+    ap.add_argument(
+        "--dump-tail",
+        action="store_true",
+        help="show parser stop offset and tail diagnostics",
+    )
+    ap.add_argument(
+        "--deep-scan",
+        action="store_true",
+        help="scan for all known block IDs across full stream",
+    )
+    ap.add_argument(
+        "--app-settings",
+        action="store_true",
+        help="decode and print ApplicationSettings blob",
+    )
+    ap.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="include human-readable descriptions",
+    )
+    ap.add_argument(
+        "--offline",
+        action="store_true",
+        help="skip GitHub schema fetch, use offline inference",
+    )
+    ap.add_argument(
+        "--schema-version",
+        default=None,
+        help="force Telegram version for schema lookup (e.g. 5.9.1)",
+    )
+    ap.add_argument(
+        "--schema-info", action="store_true", help="print loaded DBI schema and exit"
+    )
     args = ap.parse_args()
 
-    tdata = Path(args.tdata) if args.tdata else Path(
-        os.environ.get('TDATA_PATH',
-                       Path.home() / '.local/share/TelegramDesktop/tdata'))
+    tdata = (
+        Path(args.tdata)
+        if args.tdata
+        else Path(
+            os.environ.get(
+                "TDATA_PATH", Path.home() / ".local/share/TelegramDesktop/tdata"
+            )
+        )
+    )
 
     if not tdata.exists():
-        print(f'[!] tdata not found: {tdata}')
+        print(f"[!] tdata not found: {tdata}")
         sys.exit(1)
     exp_modified = False
     exp_data: dict[str, bool] = {}
@@ -93,22 +141,22 @@ Examples:
 
         if args.set_exp:
             for kv in args.set_exp:
-                if '=' not in kv:
-                    print(f'[!] --set-exp format must be KEY=BOOL (got: {kv!r})')
+                if "=" not in kv:
+                    print(f"[!] --set-exp format must be KEY=BOOL (got: {kv!r})")
                     continue
-                key, raw_value = kv.split('=', 1)
+                key, raw_value = kv.split("=", 1)
                 key = key.strip()
                 parsed = parse_bool(raw_value)
                 if parsed is None:
-                    print(f'[!] {key}: BOOL must be 0/1/true/false/on/off/yes/no')
+                    print(f"[!] {key}: BOOL must be 0/1/true/false/on/off/yes/no")
                     continue
                 if key not in _schema.EXPERIMENTAL_OPTIONS:
-                    print(f'[~] {key}: key is not in known list, but will be saved')
+                    print(f"[~] {key}: key is not in known list, but will be saved")
                 old = exp_data.get(key, None)
                 exp_data[key] = parsed
                 if old != parsed:
                     exp_modified = True
-                print(f'[✓] experimental {key} = {str(parsed).lower()}')
+                print(f"[✓] experimental {key} = {str(parsed).lower()}")
 
         if args.unset_exp:
             for key in args.unset_exp:
@@ -116,9 +164,9 @@ Examples:
                 if key in exp_data:
                     del exp_data[key]
                     exp_modified = True
-                    print(f'[✓] experimental {key} removed')
+                    print(f"[✓] experimental {key} removed")
                 else:
-                    print(f'[~] experimental {key} is not present')
+                    print(f"[~] experimental {key} is not present")
 
         if exp_modified:
             save_experimental(exp_file, exp_data)
@@ -126,15 +174,17 @@ Examples:
         if args.exp_list:
             dump_experimental(exp_data)
 
-    only_exp_actions = exp_requested and not any([
-        args.set,
-        args.export,
-        args.import_file,
-        args.dump_tail,
-        args.deep_scan,
-        args.app_settings,
-        args.schema_info,
-    ])
+    only_exp_actions = exp_requested and not any(
+        [
+            args.set,
+            args.export,
+            args.import_file,
+            args.dump_tail,
+            args.deep_scan,
+            args.app_settings,
+            args.schema_info,
+        ]
+    )
     if only_exp_actions:
         return
 
@@ -146,17 +196,19 @@ Examples:
     )
 
     if args.schema_info:
-        print(f'\n Schema for TG v{tg_version} ({len(_schema.DBI_SCHEMA)} blocks)\n')
+        print(f"\n Schema for TG v{tg_version} ({len(_schema.DBI_SCHEMA)} blocks)\n")
         for bid, (name, fmt) in sorted(_schema.DBI_SCHEMA.items()):
-            print(f'  0x{bid:04X}  {name:<35} {fmt}')
+            print(f"  0x{bid:04X}  {name:<35} {fmt}")
         return
 
     # ── Read settings ─────────────────────────────────────────────────────
-    print(f'[*] tdata: {tdata}')
+    print(f"[*] tdata: {tdata}")
     raw_data, salt, auth_key, version = load(tdata)
     seq_pos = get_positions(raw_data)
-    print(f'[*] TG version: {tg_version} | TDF version: {version} | Salt: {salt[:8].hex()}...')
-    print(f'[*] Sequential: {len(seq_pos)} blocks | Stream size: {len(raw_data)} bytes')
+    print(
+        f"[*] TG version: {tg_version} | TDF version: {version} | Salt: {salt[:8].hex()}..."
+    )
+    print(f"[*] Sequential: {len(seq_pos)} blocks | Stream size: {len(raw_data)} bytes")
 
     if args.deep_scan:
         deep_scan_diagnostic(raw_data)
@@ -171,22 +223,22 @@ Examples:
     if args.import_file:
         ip = Path(args.import_file)
         if not ip.exists():
-            print(f'[!] File not found: {ip}')
+            print(f"[!] File not found: {ip}")
             sys.exit(1)
         raw_data = import_json(raw_data, ip)
         modified = True
 
     if args.set:
         for kv in args.set:
-            if '+=' in kv or ('-=' in kv and not kv.startswith('-')):
-                k, v = kv, ''
-            elif '=' not in kv:
-                print(f'[!] Format must be KEY=VALUE (got: {kv!r})')
+            if "+=" in kv or ("-=" in kv and not kv.startswith("-")):
+                k, v = kv, ""
+            elif "=" not in kv:
+                print(f"[!] Format must be KEY=VALUE (got: {kv!r})")
                 continue
             else:
-                k, v = kv.split('=', 1)
+                k, v = kv.split("=", 1)
                 k, v = k.strip(), v.strip()
-            prev     = raw_data
+            prev = raw_data
             raw_data = apply_set(raw_data, k, v)
             if raw_data is not prev:
                 modified = True
@@ -200,14 +252,24 @@ Examples:
     dump_all(raw_data, verbose=args.verbose)
 
     if args.app_settings:
-        blob = raw_read(raw_data, _schema.DBI_SCHEMA.get(
-            next((k for k, v in _schema.DBI_SCHEMA.items() if v[0] == 'ApplicationSettings'), None)
-        ))
+        blob = raw_read(
+            raw_data,
+            _schema.DBI_SCHEMA.get(
+                next(
+                    (
+                        k
+                        for k, v in _schema.DBI_SCHEMA.items()
+                        if v[0] == "ApplicationSettings"
+                    ),
+                    None,
+                )
+            ),
+        )
         if blob:
             dump_app_settings(blob, verbose=args.verbose)
         else:
-            print('[*] ApplicationSettings not found')
+            print("[*] ApplicationSettings not found")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
