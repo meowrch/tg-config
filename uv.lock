@@ -150,3 +150,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "cryptography", specifier = ">=41.0" }]
+
+[package.metadata.requires-dev]
+dev = []

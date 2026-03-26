@@ -9,6 +9,8 @@ import os
 import sys
 from pathlib import Path
 
+import tomllib
+
 from . import schema as _schema
 from .editor import apply_set, export_json, import_json
 from .experimental import (
@@ -22,6 +24,96 @@ from .formatter import deep_scan_diagnostic, dump_all, dump_app_settings, dump_t
 from .io import load, save
 from .scanner import get_positions, raw_read
 from .schema_loader import load_schema
+
+
+def _default_config_path() -> Path:
+    """Return the default config path (XDG_CONFIG_HOME or ~/.config)."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "tg-config" / "config.toml"
+
+
+def _load_config(path: Path | None, *, required: bool):
+    """Load config TOML and return (tdata, set, set_exp, unset_exp).
+
+    - "set" / "set_exp" / "unset_exp" are lists of strings, using the same
+      format as CLI arguments.
+    - If required=True and file is missing, exits with code 1.
+    """
+
+    if path is None:
+        return None, [], [], []
+
+    if not path.exists():
+        if required:
+            print(f"[!] Config not found: {path}")
+            sys.exit(1)
+        return None, [], [], []
+
+    try:
+        with open(path, "rb") as f:
+            cfg = tomllib.load(f)
+    except Exception as e:  # pragma: no cover - config errors are runtime only
+        print(f"[!] Failed to load config {path}: {e}")
+        return None, [], [], []
+
+    if not isinstance(cfg, dict):
+        print(f"[!] Config root must be a table/object: {path}")
+        return None, [], [], []
+
+    raw_tdata = cfg.get("tdata")
+    tdata = None
+    if isinstance(raw_tdata, str) and raw_tdata.strip():
+        tdata = Path(os.path.expanduser(raw_tdata.strip()))
+
+    def _as_list(key: str) -> list[str]:
+        value = cfg.get(key)
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [str(v) for v in value]
+        print(f"[~] Config key {key!r} must be a string or list of strings; ignored")
+        return []
+
+    # Old-style list-based config (still supported)
+    set_list = _as_list("set")
+    set_exp_list = _as_list("set_exp")
+    unset_exp_list = _as_list("unset_exp")
+
+    # New-style tables:
+    # [settings]
+    #   ScalePercent = 150
+    #   AutoStart = 0
+    settings_tbl = cfg.get("settings")
+    if isinstance(settings_tbl, dict):
+        for name, value in settings_tbl.items():
+            if isinstance(value, bool):
+                v = "1" if value else "0"
+            else:
+                v = str(value)
+            set_list.append(f"{name}={v}")
+    elif settings_tbl is not None:
+        print("[~] [settings] must be a table/object; ignored")
+
+    # [experimental]
+    #   show-peer-id-below-about = true
+    experimental_tbl = cfg.get("experimental")
+    if isinstance(experimental_tbl, dict):
+        for name, value in experimental_tbl.items():
+            if isinstance(value, bool):
+                v = "1" if value else "0"
+            else:
+                v = str(value)
+            set_exp_list.append(f"{name}={v}")
+    elif experimental_tbl is not None:
+        print("[~] [experimental] must be a table/object; ignored")
+
+    if any([set_list, set_exp_list, unset_exp_list, tdata]):
+        print(f"[*] Loaded config: {path}")
+
+    return tdata, set_list, set_exp_list, unset_exp_list
 
 
 def main():
@@ -47,6 +139,11 @@ Examples:
   %(prog)s --export backup.json
   %(prog)s --import-file backup.json
 """,
+    )
+    ap.add_argument(
+        "--config",
+        default=None,
+        help="path to config TOML (default: XDG_CONFIG_HOME/tg-config/config.toml)",
     )
     ap.add_argument(
         "--tdata", default=None, help="path to Telegram Desktop tdata directory"
@@ -119,19 +216,37 @@ Examples:
     )
     args = ap.parse_args()
 
-    tdata = (
-        Path(args.tdata)
-        if args.tdata
-        else Path(
+    # ── Load config (TOML) ────────────────────────────────────────────────
+    config_path = (
+        Path(args.config).expanduser() if args.config else _default_config_path()
+    )
+    cfg_tdata, cfg_set, cfg_set_exp, cfg_unset_exp = _load_config(
+        config_path,
+        required=bool(args.config),
+    )
+
+    # Merge tdata sources: CLI > config > env/default
+    if args.tdata:
+        tdata = Path(args.tdata)
+    elif cfg_tdata is not None:
+        tdata = cfg_tdata
+    else:
+        tdata = Path(
             os.environ.get(
                 "TDATA_PATH", Path.home() / ".local/share/TelegramDesktop/tdata"
             )
         )
-    )
 
     if not tdata.exists():
         print(f"[!] tdata not found: {tdata}")
         sys.exit(1)
+
+    # Merge config actions with CLI arguments; CLI has priority because it runs last
+    # (config actions are applied first, then CLI args).
+    args.set = (cfg_set or []) + (args.set or [])
+    args.set_exp = (cfg_set_exp or []) + (args.set_exp or [])
+    args.unset_exp = (cfg_unset_exp or []) + (args.unset_exp or [])
+
     exp_modified = False
     exp_data: dict[str, bool] = {}
     exp_requested = bool(args.set_exp or args.unset_exp or args.exp_list)

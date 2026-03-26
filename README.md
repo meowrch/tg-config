@@ -52,9 +52,43 @@ uv run tg-config --tdata /path/to/tdata
 uv run tg-config --offline
 ```
 
+## Конфиг
+
+При запуске утилита пытается прочитать конфиг в формате TOML:
+
+- по умолчанию из `${XDG_CONFIG_HOME:-$HOME/.config}/tg-config/config.toml`;
+- путь можно переопределить флагом `--config /path/to/config.toml`.
+
+Сначала применяются настройки из конфига, затем — переданные аргументы командной строки,
+поэтому аргументы всегда имеют приоритет и могут переопределять значения из файла.
+
+Поддерживаемые ключи в `config.toml`:
+
+- `tdata` — строка с путём к каталогу `tdata` Telegram Desktop;
+- `[settings]` — секция, где каждый ключ соответствует имени настройки, а значение —
+  числу/булю/строке (аналог `--set Name=VALUE`);
+- `[experimental]` — секция для experimental-опций, где каждый ключ — имя опции,
+  а значение — число или bool (аналог `--set-exp key=BOOL`);
+- `set` / `set_exp` / `unset_exp` — старый синтаксис (строка или список строк), по
+  возможности стоит предпочитать таблицы `[settings]` и `[experimental]`.
+
+Пример `~/.config/tg-config/config.toml`:
+
+```toml path=null start=null
+tdata = "/home/user/.local/share/TelegramDesktop/tdata"
+
+[settings]
+ScalePercent = 150
+AutoStart = 0
+
+[experimental]
+show-peer-id-below-about = 1
+webview-debug-enabled = true
+```
+
 ## Структура проекта
 
-```
+```text path=null start=null
 tg_config/
 ├── __init__.py
 ├── __main__.py       # точка входа, argparse

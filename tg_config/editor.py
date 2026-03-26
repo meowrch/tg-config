@@ -57,7 +57,14 @@ def apply_set(data: bytes, key: str, val: str) -> bytes:
         return new_data
 
     if fmt in ("i32", "u32", "u64"):
-        value = int(val, 0)
+        try:
+            value = int(val, 0)
+        except ValueError:
+            print(
+                f"[!] {key}: expected integer for type {fmt}, got {val!r}; "
+                "skipping this change"
+            )
+            return data
     elif fmt == "str":
         value = val
     elif fmt == "ba":
