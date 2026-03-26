@@ -4,7 +4,6 @@ dump_tail_info, probe_block, deep_scan_diagnostic.
 """
 
 import struct
-from typing import TYPE_CHECKING
 
 from . import schema as _schema
 from .scanner import raw_find_block, raw_read, get_positions, _advance_for
@@ -25,11 +24,11 @@ def fmt_value(name: str, fmt: str, value) -> str:
     if fmt == 'i32':
         s = str(value)
         if name == 'ScalePercent':
-            s += ' (авто)' if value == 0 else f' ({value}%)'
+            s += ' (auto)' if value == 0 else f' ({value}%)'
         elif name == 'NotifyView':
-            s += [' (с текстом)', ' (только имя)', ' (ничего)'][value] if 0 <= value <= 2 else ''
+            s += [' (with text)', ' (name only)', ' (nothing)'][value] if 0 <= value <= 2 else ''
         elif name == 'WorkMode':
-            s += [' (окно)', ' (трей)', ' (окно+трей)'][value] if 0 <= value <= 2 else ''
+            s += [' (window)', ' (tray)', ' (window+tray)'][value] if 0 <= value <= 2 else ''
         elif name == 'PowerSaving':
             flags = [v for k, v in _schema.POWER_SAVING_FLAGS.items() if value & k]
             s += f' ({", ".join(flags)})' if flags else f' (0x{value:04X})'
@@ -37,7 +36,7 @@ def fmt_value(name: str, fmt: str, value) -> str:
                       'AutoUpdate', 'SeenTrayTooltip', 'SendToMenu', 'CompressPastedImage',
                       'AskDownloadPath', 'AutoPlayGif', 'AnimationsDisabled',
                       'RefreshSystemColorScheme'):
-            s += ' (вкл)' if value else ' (выкл)'
+            s += ' (on)' if value else ' (off)'
         elif name == 'LastUpdateCheck' and value > 0:
             import datetime
             s += f' ({datetime.datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M")})'
@@ -47,7 +46,7 @@ def fmt_value(name: str, fmt: str, value) -> str:
     if fmt == 'theme_key':
         return (f'day=0x{value["day"]:016X} '
                 f'night=0x{value["night"]:016X} '
-                f'night_mode={"да" if value["night_mode"] else "нет"}')
+                f'night_mode={"yes" if value["night_mode"] else "no"}')
     if fmt == 'two_u64':
         return f'day=0x{value["day"]:016X} night=0x{value["night"]:016X}'
     if fmt == 'two_i32':
@@ -60,7 +59,7 @@ def dump_all(data: bytes, verbose: bool = False):
     print(f'\n{BOLD}{"─"*72}{RESET}')
     print(f'{BOLD} Telegram Desktop — settings{RESET}')
     print(f'{BOLD}{"─"*72}{RESET}\n')
-    print(f' {"ID":>6} {"Имя":<35} Значение')
+    print(f' {"ID":>6} {"Name":<35} Value')
     print(f' {"─"*6} {"─"*35} {"─"*30}')
 
     found_any = False
@@ -77,19 +76,19 @@ def dump_all(data: bytes, verbose: bool = False):
         found_any = True
 
     if not found_any:
-        print(' (нет известных блоков)')
+        print(' (no known blocks found)')
     print()
 
 
 def dump_app_settings(blob: bytes, verbose: bool = False):
     if not blob:
-        print('[*] ApplicationSettings blob пуст')
+        print('[*] ApplicationSettings blob is empty')
         return
     APP_SCHEMA = _schema.APP_SCHEMA
     print(f'\n{BOLD}{"─"*72}{RESET}')
     print(f'{BOLD} ApplicationSettings (Core::Settings blob){RESET}')
     print(f'{BOLD}{"─"*72}{RESET}\n')
-    print(f' {"ID":>6} {"Имя":<35} Значение')
+    print(f' {"ID":>6} {"Name":<35} Value')
     print(f' {"─"*6} {"─"*35} {"─"*30}')
 
     p = 0
@@ -98,7 +97,7 @@ def dump_app_settings(blob: bytes, verbose: bool = False):
         block_id = struct.unpack_from('>I', blob, p)[0]
         p += 4
         if block_id not in APP_SCHEMA:
-            print(f'\n (стоп на неизвестном 0x{block_id:04X} at offset {p-4})')
+            print(f'\n (stopped at unknown block 0x{block_id:04X} at offset {p-4})')
             break
         name, fmt = APP_SCHEMA[block_id]
         try:
@@ -114,15 +113,15 @@ def dump_app_settings(blob: bytes, verbose: bool = False):
             break
         print(f' {CYAN}0x{block_id:04X}{RESET} {BOLD}{name:<35}{RESET} {GREEN}{fmt_value(name, fmt, value)}{RESET}')
         parsed += 1
-    print(f'\n Распознано: {parsed} блоков ({len(blob)} байт blob)\n')
+    print(f'\n Parsed: {parsed} blocks ({len(blob)} bytes in blob)\n')
 
 
 def probe_block(data: bytes, offset: int):
     DBI_SCHEMA = _schema.DBI_SCHEMA
     block_id = struct.unpack_from('>I', data, offset)[0]
-    print(f'[probe] Неизвестный блок 0x{block_id:04X} at offset {offset}')
-    print(f'        Байты: {data[offset:offset+40].hex()}')
-    print(f'        Подбираем размер значения:\n')
+    print(f'[probe] Unknown block 0x{block_id:04X} at offset {offset}')
+    print(f'        Bytes: {data[offset:offset+40].hex()}')
+    print('        Trying candidate value sizes:\n')
 
     candidates = [
         ('i32 (4B)', 4), ('i64 (8B)', 8),
@@ -147,13 +146,13 @@ def probe_block(data: bytes, offset: int):
         if known:
             mark = f'✅ {known[0]}'
         elif nxt_id == 0:
-            mark = '🔚 нули'
+            mark = '🔚 zeros'
         else:
-            mark = f'❌ неизвестный 0x{nxt_id:08X}'
+            mark = f'❌ unknown 0x{nxt_id:08X}'
         print(f'  {desc:<22} → next: 0x{nxt_id:08X} {mark}')
 
     print()
-    print(f'  → Добавь правильный размер в UNKNOWN_BLOCK_SIZES[0x{block_id:02X}] и перезапусти.')
+    print(f'  → Add correct size to UNKNOWN_BLOCK_SIZES[0x{block_id:02X}] and rerun.')
 
 
 def dump_tail_info(data: bytes):
@@ -171,19 +170,18 @@ def dump_tail_info(data: bytes):
             parsed_end = last_pos
 
     tail = data[parsed_end:]
-    print(f'\n[*] Sequential scan остановился на offset {parsed_end}')
-    print(f'[*] Хвост: {len(tail)} байт')
+    print(f'\n[*] Sequential scan stopped at offset {parsed_end}')
+    print(f'[*] Tail: {len(tail)} bytes')
     if len(tail) >= 4:
         first_id = struct.unpack_from('>I', tail, 0)[0]
         known    = DBI_SCHEMA.get(first_id)
-        status   = f'ИЗВЕСТНЫЙ: {known[0]}' if known else 'НЕИЗВЕСТНЫЙ'
-        print(f'[*] Первый block_id в хвосте: 0x{first_id:04X} ({status})')
+        status   = f'KNOWN: {known[0]}' if known else 'UNKNOWN'
+        print(f'[*] First block_id in tail: 0x{first_id:04X} ({status})')
         print(f'[*] HEX: {tail[:48].hex()}')
         if not known:
             print()
             probe_block(data, parsed_end)
-
-    print('\n Все найденные блоки (sequential + fallback):')
+    print('\n All found blocks (sequential + fallback):')
     found = []
     for block_id, (name, fmt) in sorted(DBI_SCHEMA.items()):
         pos = raw_find_block(data, block_id)
@@ -192,7 +190,7 @@ def dump_tail_info(data: bytes):
         in_tail = pos >= parsed_end
         value   = raw_read(data, block_id)
         val_str = fmt_value(name, fmt, value)
-        via     = '📌 хвост/fallback' if in_tail else ' sequential   '
+        via     = '📌 tail/fallback' if in_tail else ' sequential   '
         found.append((pos, block_id, name, fmt, val_str, via))
     found.sort()
     for pos, block_id, name, fmt, val_str, via in found:
@@ -204,9 +202,9 @@ def deep_scan_diagnostic(data: bytes):
     DBI_SCHEMA = _schema.DBI_SCHEMA
     positions_seq = get_positions(data)
     print(f'\n{"─"*72}')
-    print(f' Deep scan — все вхождения известных block_id в {len(data)} байтах')
+    print(f' Deep scan — all occurrences of known block_id in {len(data)} bytes')
     print(f'{"─"*72}\n')
-    print(f' {"Offset":>8} {"ID":>6} {"Имя":<30} Значение')
+    print(f' {"Offset":>8} {"ID":>6} {"Name":<30} Value')
     print(f' {"─"*8} {"─"*6} {"─"*30} {"─"*30}')
 
     found_offsets: list[tuple[int, int]] = []
@@ -250,9 +248,9 @@ def deep_scan_diagnostic(data: bytes):
                 n = struct.unpack_from('>I', data, p)[0]
                 val_str = ('null' if n == 0xFFFFFFFF
                            else f'<{fmt} {n}B>' if n <= 10 * 1024 * 1024
-                           else f'<ложное срабатывание n=0x{n:08X}>')
+                           else f'<false positive n=0x{n:08X}>')
         except (struct.error, IndexError):
-            val_str = '<ошибка чтения>'
+            val_str = '<read error>'
 
         print(f' {offset:>8} {CYAN}0x{block_id:04X}{RESET} {BOLD}{name:<30}{RESET} {val_str} {DIM}[{tag}]{RESET}')
     print()

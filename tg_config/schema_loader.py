@@ -11,7 +11,6 @@
 
 import re
 import struct
-import hashlib
 import urllib.request
 import urllib.error
 import json
@@ -146,7 +145,7 @@ def _gh_get(url: str) -> Optional[dict | list]:
             print('[!] GitHub rate limit exceeded.')
         return None
     except Exception as e:
-        print(f'[!] GitHub API ошибка: {e}')
+        print(f'[!] GitHub API error: {e}')
         return None
 
 
@@ -172,7 +171,7 @@ def find_git_tag(version_str: str) -> Optional[str]:
         prefix = f"v{parts[0]}.{parts[1]}."
         for tag in tags:
             if tag.get('name', '').startswith(prefix):
-                print(f'[~] Точный тег не найден, используем ближайший: {tag["name"]}')
+                print(f'[~] Exact tag not found, using closest match: {tag["name"]}')
                 return tag['name']
     return None
 
@@ -185,7 +184,7 @@ def fetch_scheme_header(tag: str) -> Optional[str]:
         with urllib.request.urlopen(req, timeout=15) as resp:
             return resp.read().decode('utf-8', errors='replace')
     except Exception as e:
-        print(f'[!] Не удалось скачать схему: {e}')
+        print(f'[!] Failed to download schema: {e}')
         return None
 
 
@@ -407,10 +406,10 @@ def infer_schema_from_stream(raw_stream: bytes) -> dict[int, tuple[str, str]]:
             p = vp + size
 
     if unknown_counter:
-        print(f'[~] Offline inference: {len(schema)} блоков '
-              f'({unknown_counter} неизвестных — Unknown_0xXX)')
+        print(f'[~] Offline inference: {len(schema)} blocks '
+              f'({unknown_counter} unknown — Unknown_0xXX)')
     else:
-        print(f'[✓] Offline inference: {len(schema)} блоков, все распознаны')
+        print(f'[✓] Offline inference: {len(schema)} blocks, all recognized')
 
     return schema
 
@@ -452,33 +451,33 @@ def load_schema(
     if not version:
         version = 'unknown'
 
-    print(f'[*] Версия TG: {version}')
+    print(f'[*] TG version: {version}')
 
     # ── Кэш ─────────────────────────────────────────────────────────────
     if version != 'unknown':
         cached = _load_cache(version)
         if cached:
             schema = {int(k): tuple(v) for k, v in cached.items()}
-            print(f'[*] Схема из кэша ({len(schema)} блоков)')
+            print(f'[*] Schema loaded from cache ({len(schema)} blocks)')
             return schema, version
 
     # ── GitHub ───────────────────────────────────────────────────────────
     if not offline and version != 'unknown':
-        print(f'[*] Загружаем схему с GitHub для v{version}...')
+        print(f'[*] Loading schema from GitHub for v{version}...')
         tag = find_git_tag(version)
         if tag:
-            print(f'[*] Тег: {tag}')
+            print(f'[*] Tag: {tag}')
             header_src = fetch_scheme_header(tag)
             if header_src:
                 schema = parse_dbi_enum(header_src)
                 if schema:
                     _save_cache(version, {str(k): list(v) for k, v in schema.items()})
-                    print(f'[✓] Схема с GitHub: {len(schema)} блоков, кэш сохранён')
+                    print(f'[✓] Schema from GitHub: {len(schema)} blocks, cache saved')
                     return schema, version
-        print('[~] GitHub недоступен, переходим к offline inference')
+        print('[~] GitHub unavailable, switching to offline inference')
 
     # ── Offline inference ────────────────────────────────────────────────
-    print('[*] Offline inference — строим схему из потока tdata/settings...')
+    print('[*] Offline inference — building schema from tdata/settings stream...')
 
     stream = raw_stream
     if stream is None and tdata is not None:
@@ -486,7 +485,7 @@ def load_schema(
 
     if stream is None:
         # Совсем нет данных — отдаём только якоря как минимальную схему
-        print('[~] Поток недоступен, используем минимальную якорную схему')
+        print('[~] Stream unavailable, using minimal anchor schema')
         return dict(_ANCHORS), version
 
     schema = infer_schema_from_stream(stream)
@@ -494,7 +493,7 @@ def load_schema(
     # Кэшируем результат inference чтобы не повторять каждый раз
     if version != 'unknown':
         _save_cache(version, {str(k): list(v) for k, v in schema.items()})
-        print(f'[*] Схема из inference закэширована')
+        print('[*] Inferred schema cached')
 
     return schema, version
 
@@ -524,5 +523,5 @@ def _read_raw_stream(tdata: Path) -> Optional[bytes]:
         auth_key   = derive_key(salt)
         return decrypt_local(enc, auth_key)
     except Exception as e:
-        print(f'[!] Не удалось прочитать поток для inference: {e}')
+        print(f'[!] Failed to read stream for inference: {e}')
         return None

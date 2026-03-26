@@ -4,7 +4,6 @@ Reads and patches raw DBI blocks in decrypted settings stream.
 """
 
 import struct
-from typing import TYPE_CHECKING
 
 from .tdf import _read_qt_ba, _read_qt_str, _qt_ba, _qt_str
 
@@ -154,7 +153,7 @@ def _encode_value(fmt: str, value) -> bytes:
 def raw_patch(data: bytes, block_id: int, value) -> tuple[bytes, bool]:
     DBI_SCHEMA = _schema.DBI_SCHEMA
     if block_id not in DBI_SCHEMA:
-        raise ValueError(f'block_id 0x{block_id:02X} не в схеме')
+        raise ValueError(f'block_id 0x{block_id:02X} is not in schema')
     _, fmt = DBI_SCHEMA[block_id]
     encoded = _encode_value(fmt, value)
     needle  = struct.pack('>I', block_id)

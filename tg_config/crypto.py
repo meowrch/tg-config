@@ -63,5 +63,5 @@ def decrypt_local(enc: bytes, auth_key: bytes) -> bytes:
     aes_key, aes_iv = _prepare_aes(msg_key, auth_key)
     dec = _aes_ige(enc_data, aes_key, aes_iv, encrypt=False)
     if hashlib.sha1(dec).digest()[:16] != msg_key:
-        raise ValueError("SHA1 mismatch — неверный ключ или данные повреждены")
+        raise ValueError("SHA1 mismatch — invalid key or corrupted data")
     return dec[4:struct.unpack_from('<I', dec)[0]]

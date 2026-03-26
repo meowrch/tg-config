@@ -82,7 +82,7 @@ Examples:
                        Path.home() / '.local/share/TelegramDesktop/tdata'))
 
     if not tdata.exists():
-        print(f'[!] tdata не найдена: {tdata}')
+        print(f'[!] tdata not found: {tdata}')
         sys.exit(1)
     exp_modified = False
     exp_data: dict[str, bool] = {}
@@ -94,16 +94,16 @@ Examples:
         if args.set_exp:
             for kv in args.set_exp:
                 if '=' not in kv:
-                    print(f'[!] Формат --set-exp: KEY=BOOL (получено: {kv!r})')
+                    print(f'[!] --set-exp format must be KEY=BOOL (got: {kv!r})')
                     continue
                 key, raw_value = kv.split('=', 1)
                 key = key.strip()
                 parsed = parse_bool(raw_value)
                 if parsed is None:
-                    print(f'[!] {key}: BOOL должен быть 0/1/true/false/on/off/yes/no')
+                    print(f'[!] {key}: BOOL must be 0/1/true/false/on/off/yes/no')
                     continue
                 if key not in _schema.EXPERIMENTAL_OPTIONS:
-                    print(f'[~] {key}: ключ не в известном списке, но будет сохранён')
+                    print(f'[~] {key}: key is not in known list, but will be saved')
                 old = exp_data.get(key, None)
                 exp_data[key] = parsed
                 if old != parsed:
@@ -116,9 +116,9 @@ Examples:
                 if key in exp_data:
                     del exp_data[key]
                     exp_modified = True
-                    print(f'[✓] experimental {key} удалён')
+                    print(f'[✓] experimental {key} removed')
                 else:
-                    print(f'[~] experimental {key} отсутствует')
+                    print(f'[~] experimental {key} is not present')
 
         if exp_modified:
             save_experimental(exp_file, exp_data)
@@ -146,7 +146,7 @@ Examples:
     )
 
     if args.schema_info:
-        print(f'\n Схема для TG v{tg_version} ({len(_schema.DBI_SCHEMA)} блоков)\n')
+        print(f'\n Schema for TG v{tg_version} ({len(_schema.DBI_SCHEMA)} blocks)\n')
         for bid, (name, fmt) in sorted(_schema.DBI_SCHEMA.items()):
             print(f'  0x{bid:04X}  {name:<35} {fmt}')
         return
@@ -155,8 +155,8 @@ Examples:
     print(f'[*] tdata: {tdata}')
     raw_data, salt, auth_key, version = load(tdata)
     seq_pos = get_positions(raw_data)
-    print(f'[*] TG версия: {tg_version} | TDF версия: {version} | Salt: {salt[:8].hex()}...')
-    print(f'[*] Sequential: {len(seq_pos)} блоков | Размер потока: {len(raw_data)} байт')
+    print(f'[*] TG version: {tg_version} | TDF version: {version} | Salt: {salt[:8].hex()}...')
+    print(f'[*] Sequential: {len(seq_pos)} blocks | Stream size: {len(raw_data)} bytes')
 
     if args.deep_scan:
         deep_scan_diagnostic(raw_data)
@@ -171,7 +171,7 @@ Examples:
     if args.import_file:
         ip = Path(args.import_file)
         if not ip.exists():
-            print(f'[!] Файл не найден: {ip}')
+            print(f'[!] File not found: {ip}')
             sys.exit(1)
         raw_data = import_json(raw_data, ip)
         modified = True
@@ -181,7 +181,7 @@ Examples:
             if '+=' in kv or ('-=' in kv and not kv.startswith('-')):
                 k, v = kv, ''
             elif '=' not in kv:
-                print(f'[!] Формат: KEY=VALUE (получено: {kv!r})')
+                print(f'[!] Format must be KEY=VALUE (got: {kv!r})')
                 continue
             else:
                 k, v = kv.split('=', 1)
@@ -206,7 +206,7 @@ Examples:
         if blob:
             dump_app_settings(blob, verbose=args.verbose)
         else:
-            print('[*] ApplicationSettings не найден')
+            print('[*] ApplicationSettings not found')
 
 
 if __name__ == '__main__':

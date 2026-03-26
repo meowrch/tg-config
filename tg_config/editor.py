@@ -21,8 +21,8 @@ def apply_set(data: bytes, key: str, val: str) -> bytes:
         fname = key.split(op, 1)[1]
         flag_map = {v: k for k, v in _schema.POWER_SAVING_FLAGS.items()}
         if fname not in flag_map:
-            print(f'[!] Неизвестный флаг: {fname}')
-            print(f'    Доступные: {", ".join(flag_map)}')
+            print(f'[!] Unknown flag: {fname}')
+            print(f'    Available: {", ".join(flag_map)}')
             return data
         bit     = flag_map[fname]
         cur     = raw_read(data, NAME_TO_ID['PowerSaving']) or 0
@@ -36,8 +36,8 @@ def apply_set(data: bytes, key: str, val: str) -> bytes:
         key, sub_field = _schema.ALIASES[key]
 
     if key not in NAME_TO_ID:
-        print(f'[!] Неизвестная настройка: {key}')
-        print(f'    Доступные: {", ".join(sorted(NAME_TO_ID))}')
+        print(f'[!] Unknown setting: {key}')
+        print(f'    Available: {", ".join(sorted(NAME_TO_ID))}')
         return data
 
     block_id = NAME_TO_ID[key]
@@ -46,7 +46,7 @@ def apply_set(data: bytes, key: str, val: str) -> bytes:
     if sub_field is not None:
         cur = raw_read(data, block_id)
         if cur is None:
-            print(f'[!] Блок {key} не найден в settings')
+            print(f'[!] Block {key} not found in settings')
             return data
         new_v = dict(cur)
         new_v[sub_field] = bool(int(val, 0)) if sub_field == 'night_mode' else int(val, 0)
@@ -61,7 +61,7 @@ def apply_set(data: bytes, key: str, val: str) -> bytes:
     elif fmt == 'ba':
         value = bytes.fromhex(val)
     else:
-        print(f'[!] Тип {fmt} не поддерживает прямое изменение через --set')
+        print(f'[!] Type {fmt} does not support direct --set editing')
         return data
 
     new_data, found = raw_patch(data, block_id, value)
@@ -86,7 +86,7 @@ def export_json(data: bytes, path: Path):
             result[name] = value
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2, default=str)
-    print(f'[✓] Экспортировано {len(result)} полей → {path}')
+    print(f'[✓] Exported {len(result)} fields → {path}')
 
 
 def import_json(data: bytes, path: Path) -> bytes:
@@ -97,7 +97,7 @@ def import_json(data: bytes, path: Path) -> bytes:
     for name, val in obj.items():
         if name.startswith('_') or name not in NAME_TO_ID:
             if not name.startswith('_'):
-                print(f'[!] {name}: не в схеме, пропущено')
+                print(f'[!] {name}: not in schema, skipped')
             continue
         block_id = NAME_TO_ID[name]
         _, fmt   = DBI_SCHEMA[block_id]

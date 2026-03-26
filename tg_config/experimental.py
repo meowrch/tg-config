@@ -31,11 +31,11 @@ def load_experimental(path: Path) -> dict[str, bool]:
         with open(path, encoding='utf-8') as f:
             obj = json.load(f)
     except Exception as e:
-        print(f'[!] Не удалось прочитать {path}: {e}')
+        print(f'[!] Failed to read {path}: {e}')
         return {}
 
     if not isinstance(obj, dict):
-        print(f'[!] {path}: ожидается JSON-объект')
+        print(f'[!] {path}: expected a JSON object')
         return {}
 
     result: dict[str, bool] = {}
@@ -45,7 +45,7 @@ def load_experimental(path: Path) -> dict[str, bool]:
         elif isinstance(value, int) and value in (0, 1):
             result[key] = bool(value)
         else:
-            print(f'[~] {key}: не-bool значение, пропущено')
+            print(f'[~] {key}: non-bool value, skipped')
     return result
 
 
@@ -55,25 +55,25 @@ def save_experimental(path: Path, options: dict[str, bool]):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=4)
         f.write('\n')
-    print(f'[✓] experimental options сохранены: {path}')
+    print(f'[✓] experimental options saved: {path}')
 
 
 def dump_experimental(options: dict[str, bool]):
     print('\n experimental_options.json')
-    print(f' {"Ключ":<45} {"Значение":<10} Статус')
+    print(f' {"Key":<45} {"Value":<10} Status')
     print(f' {"─"*45} {"─"*10} {"─"*20}')
     for key in _schema.EXPERIMENTAL_OPTIONS:
         if key in options:
             val = 'true' if options[key] else 'false'
-            status = 'явно задано'
+            status = 'explicitly set'
         else:
             val = 'false'
-            status = 'по умолчанию'
+            status = 'default'
         print(f' {key:<45} {val:<10} {status}')
 
     extras = sorted(k for k in options if k not in _schema.EXPERIMENTAL_OPTIONS)
     if extras:
-        print('\n Доп. ключи (не из списка settings_experimental.cpp):')
+        print('\n Extra keys (not from settings_experimental.cpp list):')
         for key in extras:
             val = 'true' if options[key] else 'false'
             print(f'   {key} = {val}')

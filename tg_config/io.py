@@ -28,4 +28,4 @@ def save(tdata: Path, raw_data: bytes, salt: bytes, auth_key: bytes, version: in
     enc     = encrypt_local(raw_data, auth_key)
     payload = _qt_ba(salt) + _qt_ba(enc)
     write_tdf(tdata / 'settings', payload, version)
-    print(f'[✓] settings сохранён ({len(raw_data)} байт)')
+    print(f'[✓] settings saved ({len(raw_data)} bytes)')
