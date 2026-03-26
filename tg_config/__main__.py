@@ -15,6 +15,13 @@ from .scanner import get_positions, raw_read
 from .formatter import dump_all, dump_app_settings, dump_tail_info, deep_scan_diagnostic
 from .editor import apply_set, export_json, import_json
 from .io import load, save
+from .experimental import (
+    experimental_path,
+    parse_bool,
+    load_experimental,
+    save_experimental,
+    dump_experimental,
+)
 
 
 def main():
@@ -22,35 +29,52 @@ def main():
         description='Telegram Desktop settings reader/writer',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Примеры:
-  %(prog)s                              # показать все настройки
-  %(prog)s -v                           # с описаниями
-  %(prog)s --dump-tail                  # диагностика хвоста
-  %(prog)s --deep-scan                  # все вхождения через bytes.find
+Examples:
+  %(prog)s                              # show all known settings
+  %(prog)s -v                           # include field descriptions
+  %(prog)s --dump-tail                  # inspect unparsed tail in stream
+  %(prog)s --deep-scan                  # find all known IDs via bytes.find
   %(prog)s --set ScalePercent=150
   %(prog)s --set AutoStart=1 --set StartMinimized=1
   %(prog)s --set NightMode=1
   %(prog)s --set AnimationsDisabled=1
   %(prog)s --set "PowerSaving+=AllAnimations"
   %(prog)s --set "PowerSaving-=AnimatedStickers"
+  %(prog)s --set-exp show-peer-id-below-about=1
+  %(prog)s --unset-exp webview-debug-enabled
+  %(prog)s --exp-list
   %(prog)s --app-settings
   %(prog)s --export backup.json
   %(prog)s --import-file backup.json
 """)
-    ap.add_argument('--tdata',          default=None)
-    ap.add_argument('--set',            action='append', metavar='KEY=VALUE')
-    ap.add_argument('--export',         metavar='FILE')
-    ap.add_argument('--import-file',    metavar='FILE', dest='import_file')
-    ap.add_argument('--dump-tail',      action='store_true')
-    ap.add_argument('--deep-scan',      action='store_true')
-    ap.add_argument('--app-settings',   action='store_true')
-    ap.add_argument('-v', '--verbose',  action='store_true')
+    ap.add_argument('--tdata',          default=None,
+                    help='path to Telegram Desktop tdata directory')
+    ap.add_argument('--set',            action='append', metavar='KEY=VALUE',
+                    help='set DBI setting value (can be used multiple times)')
+    ap.add_argument('--set-exp',        action='append', metavar='KEY=BOOL',
+                    help='set experimental option in experimental_options.json')
+    ap.add_argument('--unset-exp',      action='append', metavar='KEY',
+                    help='remove key from experimental_options.json')
+    ap.add_argument('--exp-list',       action='store_true',
+                    help='print known experimental options and current values')
+    ap.add_argument('--export',         metavar='FILE',
+                    help='export current known DBI settings to JSON')
+    ap.add_argument('--import-file',    metavar='FILE', dest='import_file',
+                    help='import DBI settings from JSON')
+    ap.add_argument('--dump-tail',      action='store_true',
+                    help='show parser stop offset and tail diagnostics')
+    ap.add_argument('--deep-scan',      action='store_true',
+                    help='scan for all known block IDs across full stream')
+    ap.add_argument('--app-settings',   action='store_true',
+                    help='decode and print ApplicationSettings blob')
+    ap.add_argument('-v', '--verbose',  action='store_true',
+                    help='include human-readable descriptions')
     ap.add_argument('--offline',        action='store_true',
-                    help='не обращаться к GitHub, использовать fallback-схему')
+                    help='skip GitHub schema fetch, use offline inference')
     ap.add_argument('--schema-version', default=None,
-                    help='принудительно задать версию TG (напр. 5.9.1)')
+                    help='force Telegram version for schema lookup (e.g. 5.9.1)')
     ap.add_argument('--schema-info',    action='store_true',
-                    help='показать загруженную схему и выйти')
+                    help='print loaded DBI schema and exit')
     args = ap.parse_args()
 
     tdata = Path(args.tdata) if args.tdata else Path(
@@ -60,6 +84,59 @@ def main():
     if not tdata.exists():
         print(f'[!] tdata не найдена: {tdata}')
         sys.exit(1)
+    exp_modified = False
+    exp_data: dict[str, bool] = {}
+    exp_requested = bool(args.set_exp or args.unset_exp or args.exp_list)
+    if exp_requested:
+        exp_file = experimental_path(tdata)
+        exp_data = load_experimental(exp_file)
+
+        if args.set_exp:
+            for kv in args.set_exp:
+                if '=' not in kv:
+                    print(f'[!] Формат --set-exp: KEY=BOOL (получено: {kv!r})')
+                    continue
+                key, raw_value = kv.split('=', 1)
+                key = key.strip()
+                parsed = parse_bool(raw_value)
+                if parsed is None:
+                    print(f'[!] {key}: BOOL должен быть 0/1/true/false/on/off/yes/no')
+                    continue
+                if key not in _schema.EXPERIMENTAL_OPTIONS:
+                    print(f'[~] {key}: ключ не в известном списке, но будет сохранён')
+                old = exp_data.get(key, None)
+                exp_data[key] = parsed
+                if old != parsed:
+                    exp_modified = True
+                print(f'[✓] experimental {key} = {str(parsed).lower()}')
+
+        if args.unset_exp:
+            for key in args.unset_exp:
+                key = key.strip()
+                if key in exp_data:
+                    del exp_data[key]
+                    exp_modified = True
+                    print(f'[✓] experimental {key} удалён')
+                else:
+                    print(f'[~] experimental {key} отсутствует')
+
+        if exp_modified:
+            save_experimental(exp_file, exp_data)
+
+        if args.exp_list:
+            dump_experimental(exp_data)
+
+    only_exp_actions = exp_requested and not any([
+        args.set,
+        args.export,
+        args.import_file,
+        args.dump_tail,
+        args.deep_scan,
+        args.app_settings,
+        args.schema_info,
+    ])
+    if only_exp_actions:
+        return
 
     # ── Load schema ──────────────────────────────────────────────────────
     _schema.DBI_SCHEMA, tg_version = load_schema(

@@ -93,3 +93,36 @@ APP_SCHEMA: dict[int, tuple[str, str]] = {
     0x36: ('VoiceRecordBitrateKbps',    'i32'),
     0x37: ('VideoMessageQuality',       'i32'),
 }
+
+# Known keys from Telegram Desktop experimental_options.json
+# (settings/settings_experimental.cpp + referenced option ids)
+EXPERIMENTAL_OPTIONS: dict[str, str] = {
+    'tabbed-panel-show-on-click':               'Показывать панель эмодзи/стикеров по клику',
+    'forum-hide-chats-list':                    'Скрывать список чатов в форумах',
+    'fractional-scaling-enabled':               'Точный fractional scaling',
+    'high-dpi-downscale':                       'Альтернативный High-DPI downscale',
+    'view-profile-in-chats-list-context-menu':  'Пункт “View Profile” в контекстном меню списка чатов',
+    'show-peer-id-below-about':                 'Показывать Peer ID в профиле',
+    'show-channel-joined-below-about':          'Показывать дату вступления в канал',
+    'use-small-msg-bubble-radius':              'Малый радиус пузырей сообщений',
+    'disable-autoplay-next':                    'Отключить autoplay следующего трека',
+    'send-large-photos':                        'Отправлять фото с увеличенным лимитом стороны',
+    'webview-debug-enabled':                    'Включить debug webview',
+    'webview-legacy-edge':                      'Использовать legacy Edge webview',
+    'auto-scroll-inactive-chat':                'Автопрокрутка/прочтение неактивного чата',
+    'hide-reply-button':                        'Скрыть кнопку Reply в уведомлениях',
+    'custom-notification':                      'Форсировать доступность non-native notifications',
+    'gnotification':                            'Форсировать GLib GNotification',
+    'freetype':                                 'Использовать FreeType font engine',
+    'skip-url-scheme-register':                 'Пропустить регистрацию tg:// при обновлении',
+    'deadlock-detector':                        'Включить детектор deadlock',
+    'external-media-viewer':                    'Использовать внешний media viewer',
+    'new-windows-size-as-first':                'Новые окна с размером первого окна',
+    'prefer-ipv6':                              'Предпочитать IPv6',
+    'fast-buttons-mode':                        'Режим быстрых кнопок (1-9)',
+    'touchbar-disabled':                        'Отключить Touch Bar (macOS)',
+    'alternative-scroll-processing':            'Legacy-обработка скролла в профилях',
+    'moderate-common-groups':                   'Модерация сразу в нескольких группах',
+    'force-compose-search-one-column':          'Форсировать встроенный поиск в one-column',
+    'unlimited-recent-stickers':                'Безлимит недавних стикеров',
+}

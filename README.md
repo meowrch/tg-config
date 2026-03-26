@@ -30,6 +30,12 @@ uv run tg-config --set AutoStart=1 --set StartMinimized=1
 uv run tg-config --set "PowerSaving+=AllAnimations"
 uv run tg-config --set "PowerSaving-=AnimatedStickers"
 
+# Experimental options (tdata/experimental_options.json)
+uv run tg-config --set-exp show-peer-id-below-about=1
+uv run tg-config --set-exp webview-debug-enabled=true
+uv run tg-config --unset-exp webview-debug-enabled
+uv run tg-config --exp-list
+
 # Бэкап / восстановление
 uv run tg-config --export backup.json
 uv run tg-config --import-file backup.json
