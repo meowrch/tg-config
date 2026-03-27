@@ -53,13 +53,14 @@ def read_tdf(base: Path) -> tuple[bytes, int]:
         raw = f.read_bytes()
         if raw[:4] != TDF_MAGIC:
             continue
-        return raw[8:-16], struct.unpack_from("<I", raw, 4)[0]
+        return raw[8:-16], struct.unpack_from("<i", raw, 4)[0]
     raise FileNotFoundError(f"No valid TDF file found at {base}")
 
 
 def write_tdf(base: Path, payload: bytes, version: int):
-    header = TDF_MAGIC + struct.pack("<I", version)
-    md5 = hashlib.md5(payload + struct.pack("<I", len(payload)) + header).digest()
+    header = TDF_MAGIC + struct.pack("<i", version)
+    # MD5 order must match Telegram Desktop: payload + len + version + magic
+    md5_input = payload + struct.pack("<i", len(payload)) + struct.pack("<i", version) + TDF_MAGIC
+    md5 = hashlib.md5(md5_input).digest()
     data = header + payload + md5
-    for s in ["s", "0", "1"]:
-        Path(str(base) + s).write_bytes(data)
+    Path(str(base) + "s").write_bytes(data)

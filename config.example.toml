@@ -1,0 +1,36 @@
+# tg-config configuration file
+# Place this at: ~/.config/tg-config/config.toml
+
+# Path to Telegram Desktop tdata directory (optional)
+# tdata = "~/.local/share/TelegramDesktop/tdata"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Settings - Main Telegram Desktop settings
+# ═══════════════════════════════════════════════════════════════════════════
+
+[settings]
+ScalePercent = 150         # UI scale: 0=auto, 100, 125, 150, 200, 300
+AutoStart = 0              # Launch on system startup (0=off, 1=on)
+# StartMinimized = 0       # Start minimized to tray
+# AnimationsDisabled = 0   # Disable UI animations
+# PowerSaving = 0          # Power saving flags (bitmask)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Experimental - Experimental Telegram features
+# ═══════════════════════════════════════════════════════════════════════════
+
+[experimental]
+show-peer-id-below-about = true
+webview-debug-enabled = true
+# disable-up-edit = false
+# net-speed-boost = false
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Theme - Apply .tdesktop-theme file
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTE: Telegram Desktop MUST be closed when applying themes!
+# The theme will be applied automatically when you run tg-config.
+
+[theme]
+path = "~/themes/my-theme.tdesktop-theme"
+

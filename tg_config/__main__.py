@@ -34,32 +34,33 @@ def _default_config_path() -> Path:
 
 
 def _load_config(path: Path | None, *, required: bool):
-    """Load config TOML and return (tdata, set, set_exp, unset_exp).
+    """Load config TOML and return (tdata, set, set_exp, unset_exp, theme_path).
 
     - "set" / "set_exp" / "unset_exp" are lists of strings, using the same
       format as CLI arguments.
+    - "theme_path" is the path to .tdesktop-theme file if specified
     - If required=True and file is missing, exits with code 1.
     """
 
     if path is None:
-        return None, [], [], []
+        return None, [], [], [], None
 
     if not path.exists():
         if required:
             print(f"[!] Config not found: {path}")
             sys.exit(1)
-        return None, [], [], []
+        return None, [], [], [], None
 
     try:
         with open(path, "rb") as f:
             cfg = tomllib.load(f)
     except Exception as e:  # pragma: no cover - config errors are runtime only
         print(f"[!] Failed to load config {path}: {e}")
-        return None, [], [], []
+        return None, [], [], [], None
 
     if not isinstance(cfg, dict):
         print(f"[!] Config root must be a table/object: {path}")
-        return None, [], [], []
+        return None, [], [], [], None
 
     raw_tdata = cfg.get("tdata")
     tdata = None
@@ -110,10 +111,24 @@ def _load_config(path: Path | None, *, required: bool):
     elif experimental_tbl is not None:
         print("[~] [experimental] must be a table/object; ignored")
 
-    if any([set_list, set_exp_list, unset_exp_list, tdata]):
+    # [theme]
+    #   path = "/path/to/theme.tdesktop-theme"
+    theme_path = None
+    theme_tbl = cfg.get("theme")
+    if isinstance(theme_tbl, dict):
+        raw_path = theme_tbl.get("path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            theme_path = Path(os.path.expanduser(raw_path.strip()))
+    elif isinstance(theme_tbl, str) and theme_tbl.strip():
+        # Also support: theme = "/path/to/theme.tdesktop-theme"
+        theme_path = Path(os.path.expanduser(theme_tbl.strip()))
+    elif theme_tbl is not None:
+        print("[~] [theme] must be a table with 'path' or a string; ignored")
+
+    if any([set_list, set_exp_list, unset_exp_list, tdata, theme_path]):
         print(f"[*] Loaded config: {path}")
 
-    return tdata, set_list, set_exp_list, unset_exp_list
+    return tdata, set_list, set_exp_list, unset_exp_list, theme_path
 
 
 def main():
@@ -220,7 +235,7 @@ Examples:
     config_path = (
         Path(args.config).expanduser() if args.config else _default_config_path()
     )
-    cfg_tdata, cfg_set, cfg_set_exp, cfg_unset_exp = _load_config(
+    cfg_tdata, cfg_set, cfg_set_exp, cfg_unset_exp, cfg_theme_path = _load_config(
         config_path,
         required=bool(args.config),
     )
@@ -246,6 +261,16 @@ Examples:
     args.set = (cfg_set or []) + (args.set or [])
     args.set_exp = (cfg_set_exp or []) + (args.set_exp or [])
     args.unset_exp = (cfg_unset_exp or []) + (args.unset_exp or [])
+    
+    # Apply theme if specified in config (Telegram must be closed)
+    if cfg_theme_path:
+        from .theme import apply_theme
+        
+        if cfg_theme_path.exists():
+            print(f"[*] Applying theme from config: {cfg_theme_path}")
+            apply_theme(cfg_theme_path, tdata, night=False)
+        else:
+            print(f"[!] Theme file not found: {cfg_theme_path}")
 
     exp_modified = False
     exp_data: dict[str, bool] = {}

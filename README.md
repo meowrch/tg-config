@@ -69,6 +69,9 @@ uv run tg-config --offline
   числу/булю/строке (аналог `--set Name=VALUE`);
 - `[experimental]` — секция для experimental-опций, где каждый ключ — имя опции,
   а значение — число или bool (аналог `--set-exp key=BOOL`);
+- `[theme]` — секция с ключом `path` для автоматического применения `.tdesktop-theme` файла;
+  альтернативный короткий синтаксис: `theme = "путь"`. **ВАЖНО:** Telegram Desktop должен
+  быть закрыт при применении темы!
 - `set` / `set_exp` / `unset_exp` — старый синтаксис (строка или список строк), по
   возможности стоит предпочитать таблицы `[settings]` и `[experimental]`.
 
@@ -84,7 +87,12 @@ AutoStart = 0
 [experimental]
 show-peer-id-below-about = 1
 webview-debug-enabled = true
+
+[theme]
+path = "~/themes/my-theme.tdesktop-theme"
 ```
+
+Полный пример конфига с комментариями: `config.example.toml`
 
 ## Структура проекта
 
@@ -99,6 +107,8 @@ tg_config/
 ├── scanner.py        # бинарный сканер потока, raw_read/patch
 ├── formatter.py      # fmt_value, dump_all, диагностика
 ├── editor.py         # apply_set, export/import JSON
+├── experimental.py   # experimental_options.json handler
+├── theme.py          # apply .tdesktop-theme files
 └── io.py             # load/save tdata/settings
 ```
 
