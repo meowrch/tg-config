@@ -2,7 +2,7 @@
 pkgname=tg-config
 pkgver=0.1.0
 pkgrel=1
-pkgdesc="Telegram Desktop settings reader/writer with automatic configuration wrapper"
+pkgdesc="Declarative Telegram Desktop configuration via TOML config files - perfect for dotfiles and ricing"
 arch=('any')
 url="https://github.com/meowrch/tg-config"
 license=('GPL-3.0')
