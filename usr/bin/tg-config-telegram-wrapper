@@ -1,0 +1,11 @@
+#!/bin/bash
+# Wrapper for Telegram Desktop with tg-config integration
+# This script applies tg-config settings before launching Telegram
+
+# Apply tg-config settings (suppress output unless there's an error)
+if command -v tg-config &> /dev/null; then
+    tg-config &> /dev/null || true
+fi
+
+# Launch original Telegram
+exec /usr/bin/Telegram.original "$@"

@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = telegram-desktop
+
+[Action]
+Description = Setting up tg-config wrapper for Telegram Desktop...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/tg-config-setup-wrapper

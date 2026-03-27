@@ -1,0 +1,28 @@
+#!/bin/bash
+# Script called by alpm hook when telegram-desktop is installed/upgraded
+
+# Check if /usr/bin/Telegram exists
+if [ ! -f /usr/bin/Telegram ]; then
+    exit 0
+fi
+
+# Skip if already wrapped (symlink to our wrapper)
+if [ -L /usr/bin/Telegram ] && [ "$(readlink /usr/bin/Telegram)" = "/usr/bin/tg-config-telegram-wrapper" ]; then
+    exit 0
+fi
+
+# If Telegram.original exists and current Telegram is not a symlink, 
+# it means telegram-desktop was updated and overwrote our symlink
+if [ -f /usr/bin/Telegram.original ] && [ ! -L /usr/bin/Telegram ]; then
+    # Backup the new version
+    rm -f /usr/bin/Telegram.original
+    mv /usr/bin/Telegram /usr/bin/Telegram.original
+    ln -s /usr/bin/tg-config-telegram-wrapper /usr/bin/Telegram
+    exit 0
+fi
+
+# First time setup
+if [ ! -f /usr/bin/Telegram.original ]; then
+    mv /usr/bin/Telegram /usr/bin/Telegram.original
+    ln -s /usr/bin/tg-config-telegram-wrapper /usr/bin/Telegram
+fi
