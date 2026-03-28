@@ -239,6 +239,39 @@ Examples:
         config_path,
         required=bool(args.config),
     )
+    
+    # Check if config exists and no CLI actions specified
+    has_cli_actions = any([
+        args.set,
+        args.set_exp,
+        args.unset_exp,
+        args.exp_list,
+        args.export,
+        args.import_file,
+        args.dump_tail,
+        args.deep_scan,
+        args.app_settings,
+        args.schema_info,
+    ])
+    
+    if not config_path.exists() and not has_cli_actions:
+        print(f"""[!] Config file not found: {config_path}
+
+Create a config file to automatically apply settings on Telegram startup:
+
+  mkdir -p {config_path.parent}
+  cp /usr/share/doc/tg-config/config.example.toml {config_path}
+  
+  # Or for manual installation:
+  # Get example from: https://github.com/meowrch/tg-config/blob/main/config.example.toml
+
+Then edit the config with your preferred settings.
+
+Alternatively, use CLI arguments to modify settings directly:
+  tg-config --set ScalePercent=150
+  tg-config --set NightMode=1
+""")
+        sys.exit(0)
 
     # Merge tdata sources: CLI > config > env/default
     if args.tdata:
@@ -343,7 +376,25 @@ Examples:
 
     # ── Read settings ─────────────────────────────────────────────────────
     print(f"[*] tdata: {tdata}")
-    raw_data, salt, auth_key, version = load(tdata)
+    
+    # Check if settings file exists
+    try:
+        raw_data, salt, auth_key, version = load(tdata)
+    except FileNotFoundError:
+        print(f"""[!] Telegram settings file not found in: {tdata}
+
+This usually means Telegram Desktop has never been launched on this system.
+
+To fix this:
+  1. Launch Telegram Desktop at least once
+  2. Complete the initial setup (login if needed)
+  3. Close Telegram
+  4. Run tg-config again
+
+The settings file will be created automatically after the first launch.
+""")
+        sys.exit(1)
+    
     seq_pos = get_positions(raw_data)
     print(
         f"[*] TG version: {tg_version} | TDF version: {version} | Salt: {salt[:8].hex()}..."
