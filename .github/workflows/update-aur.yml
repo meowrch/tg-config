@@ -22,11 +22,12 @@ jobs:
           HASH=$(curl -sL "$URL" | sha256sum | cut -d' ' -f1)
           echo "hash=$HASH" >> $GITHUB_OUTPUT
 
-      - name: Update PKGBUILD
+      - name: Update Stable PKGBUILD
         run: |
           sed -i \
             -e "s/^pkgver=.*/pkgver=${{ steps.get_version.outputs.version }}/" \
             -e "s|^source=.*|source=(\"\$url/archive/refs/tags/v\$pkgver.tar.gz\")|" \
+            -e "s/tg-config-v\$pkgver/tg-config-\$pkgver/" \
             -e "s/^sha256sums=.*/sha256sums=('${{ steps.sha256.outputs.hash }}')/" \
             PKGBUILD
 
