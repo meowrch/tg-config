@@ -1,64 +1,64 @@
 # tg-config
 
-> **Управляй настройками Telegram Desktop через конфиги вместо GUI!**
+> **Manage Telegram Desktop settings via config files instead of the GUI!**
 
-Утилита для чтения и записи настроек **Telegram Desktop** напрямую в бинарный формат `tdata/settings`.
+A utility for reading and writing **Telegram Desktop** settings directly into the `tdata/settings` binary format.
 
-## Зачем это нужно?
+## Why do you need this?
 
-### 🎨 Для райсеров и dotfiles энтузиастов
+### 🎨 For Ricers and Dotfiles Enthusiasts
 
-- **Декларативная конфигурация** — все настройки Telegram в одном TOML файле, как и остальные dotfiles
-- **Версионирование в Git** — храни и синхронизируй конфиг Telegram вместе с остальными dotfiles
-- **Автоматизация** — применяй настройки автоматически при запуске Telegram
-- **Темизация** — автоматическое применение `.tdesktop-theme` файлов
-- **Воспроизводимость** — быстрое восстановление настроек на новой системе
+- **Declarative Configuration** — keep all your Telegram settings in a single TOML file, just like the rest of your dotfiles.
+- **Git Versioning** — store and sync your Telegram config along with your system configurations.
+- **Automation** — apply settings automatically every time you launch Telegram.
+- **Theming** — automatically apply `.tdesktop-theme` files.
+- **Reproducibility** — quickly restore your preferred settings on a fresh OS installation.
 
-### 💡 Примеры использования
+### 💡 Use Cases
 
-- Настроить масштаб интерфейса, автозапуск, минимизацию в трей
-- Включить экспериментальные фичи (например, показ peer ID)
-- Применить кастомную тему при старте системы
-- Синхронизировать настройки между несколькими компьютерами через dotfiles репозиторий
-- Быстро переключаться между светлой/тёмной темой скриптом
+- Configure UI scale, auto-start, and "minimize to tray" behavior.
+- Enable experimental features (e.g., showing Peer IDs).
+- Apply custom themes on system startup.
+- Sync settings between multiple machines via a dotfiles repository.
+- Quickly toggle between light/dark modes using a script.
 
-## Установка
+## Installation
 
 ### Arch Linux (AUR)
 
 ```bash
 yay -S tg-config
-# или
+# or
 paru -S tg-config
 ```
 
-После установки Telegram будет автоматически запускаться через wrapper, который применяет настройки из `~/.config/tg-config/config.toml` перед каждым запуском.
+After installation, Telegram will automatically run through a wrapper that applies settings from `~/.config/tg-config/config.toml` before each launch.
 
-### Из исходников
+### From Source
 
 ```bash
-# через uv (рекомендуется)
+# via uv (recommended)
 uv sync
 uv run tg-config
 
-# или обычный pip
+# or standard pip
 pip install -e .
 python -m tg_config
 ```
 
-**Для AUR пакета:** настройки применяются автоматически при запуске Telegram.  
-**Для ручной установки:** запускай `tg-config` вручную или добавь в автозапуск.
+**For AUR package:** Settings are applied automatically when you start Telegram.  
+**For manual installation:** Run `tg-config` manually or add it to your startup scripts.
 
-## Использование
+## Usage
 
 ```bash
-# Показать все настройки
+# List all settings
 uv run tg-config
 
-# С описаниями
+# List with descriptions
 uv run tg-config -v
 
-# Изменить настройку
+# Change a setting
 uv run tg-config --set ScalePercent=150
 uv run tg-config --set NightMode=1
 uv run tg-config --set AutoStart=1 --set StartMinimized=1
@@ -71,48 +71,43 @@ uv run tg-config --set-exp webview-debug-enabled=true
 uv run tg-config --unset-exp webview-debug-enabled
 uv run tg-config --exp-list
 
-# Бэкап / восстановление
+# Backup / Restore
 uv run tg-config --export backup.json
 uv run tg-config --import-file backup.json
 
-# Диагностика
+# Diagnostics
 uv run tg-config --dump-tail
 uv run tg-config --deep-scan
 uv run tg-config --schema-info
 
-# Кастомный путь к tdata
+# Custom tdata path
 uv run tg-config --tdata /path/to/tdata
 
-# Offline режим (без запросов к GitHub)
+# Offline mode (skips GitHub API requests)
 uv run tg-config --offline
 ```
 
-## Конфиг
+## Configuration
 
-При запуске утилита пытается прочитать конфиг в формате TOML:
+On startup, the utility looks for a TOML configuration file:
 
-- по умолчанию из `${XDG_CONFIG_HOME:-$HOME/.config}/tg-config/config.toml`;
-- путь можно переопределить флагом `--config /path/to/config.toml`.
+- Default location: `${XDG_CONFIG_HOME:-$HOME/.config}/tg-config/config.toml`
+- Override path using the `--config /path/to/config.toml` flag.
 
-Сначала применяются настройки из конфига, затем — переданные аргументы командной строки,
-поэтому аргументы всегда имеют приоритет и могут переопределять значения из файла.
+Settings from the config file are applied first, followed by command-line arguments. This means CLI arguments always take priority.
 
-Поддерживаемые ключи в `config.toml`:
+### Supported `config.toml` Keys:
 
-- `tdata` — строка с путём к каталогу `tdata` Telegram Desktop;
-- `[settings]` — секция, где каждый ключ соответствует имени настройки, а значение —
-  числу/булю/строке (аналог `--set Name=VALUE`);
-- `[experimental]` — секция для experimental-опций, где каждый ключ — имя опции,
-  а значение — число или bool (аналог `--set-exp key=BOOL`);
-- `[theme]` — секция с ключом `path` для автоматического применения `.tdesktop-theme` файла;
-  альтернативный короткий синтаксис: `theme = "путь"`. **ВАЖНО:** Telegram Desktop должен
-  быть закрыт при применении темы!
-- `set` / `set_exp` / `unset_exp` — старый синтаксис (строка или список строк), по
-  возможности стоит предпочитать таблицы `[settings]` и `[experimental]`.
+- `tdata` — String path to the Telegram Desktop `tdata` directory.
+- `[settings]` — Section where each key maps to a setting name, and the value is a number/bool/string (equivalent to `--set Name=VALUE`).
+- `[experimental]` — Section for experimental options (equivalent to `--set-exp key=BOOL`).
+- `[theme]` — Section with a `path` key for auto-applying a `.tdesktop-theme` file.
+  *Alternative short syntax:* `theme = "path/to/theme"`.
+  **IMPORTANT:** Telegram Desktop must be closed when applying a theme!
 
-Пример `~/.config/tg-config/config.toml`:
+### Example `~/.config/tg-config/config.toml`:
 
-```toml path=null start=null
+```toml
 tdata = "/home/user/.local/share/TelegramDesktop/tdata"
 
 [settings]
@@ -127,28 +122,26 @@ webview-debug-enabled = true
 path = "~/themes/my-theme.tdesktop-theme"
 ```
 
-Полный пример конфига с комментариями: `config.example.toml`
+*For a full commented example, see `config.example.toml`.*
 
-## Структура проекта
+## Project Structure
 
-```text path=null start=null
+```text
 tg_config/
 ├── __init__.py
-├── __main__.py       # точка входа, argparse
+├── __main__.py       # Entry point, argparse
 ├── crypto.py         # AES-IGE encrypt/decrypt
-├── tdf.py            # TDF$ формат + Qt-сериализация
-├── schema.py         # константы: DBI_SCHEMA, APP_SCHEMA, описания
-├── schema_loader.py  # детект версии TG, GitHub API, кэш
-├── scanner.py        # бинарный сканер потока, raw_read/patch
-├── formatter.py      # fmt_value, dump_all, диагностика
+├── tdf.py            # TDF$ format + Qt serialization
+├── schema.py         # Constants: DBI_SCHEMA, APP_SCHEMA, descriptions
+├── schema_loader.py  # TG version detection, GitHub API, caching
+├── scanner.py        # Binary stream scanner, raw_read/patch
+├── formatter.py      # Value formatting, dump_all, diagnostics
 ├── editor.py         # apply_set, export/import JSON
 ├── experimental.py   # experimental_options.json handler
 ├── theme.py          # apply .tdesktop-theme files
 └── io.py             # load/save tdata/settings
 ```
 
-## Схема
+## Schema
 
-Схема DBI-блоков загружается динамически из исходников tdesktop для конкретной версии TG.
-Кэшируется в `~/.cache/tg-settings/schema_<version>.json`.
-При отсутствии сети используется встроенный fallback.
+The DBI-block schema is loaded dynamically from the Telegram Desktop source code for your specific version. It is cached in `~/.cache/tg-settings/schema_<version>.json`. If there is no internet connection, a built-in fallback is used.
